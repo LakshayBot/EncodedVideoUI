@@ -1,10 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { encryptText, decryptText } from '@/utils/encryptionApi';
-import { Lock, Unlock, Key, Loader2, Copy, Check, AlertCircle, RefreshCw, HelpCircle, Info, ArrowRight, X } from 'lucide-react';
+import { 
+    Lock, Unlock, Key, Loader2, Copy, Check, AlertCircle, RefreshCw, 
+    HelpCircle, Info, ArrowRight, X, MessageSquare, Send 
+} from 'lucide-react';
 import { cn, generateRandomKey } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { motion, AnimatePresence } from 'framer-motion';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function TextEncryption() {
     const [inputText, setInputText] = useState('');
@@ -17,9 +26,10 @@ export function TextEncryption() {
     const [copied, setCopied] = useState(false);
     const [mode, setMode] = useState<'encrypt' | 'decrypt'>('encrypt');
     const [progressValue, setProgressValue] = useState(0);
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const outputRef = useRef<HTMLDivElement>(null);
+    const [recentResults, setRecentResults] = useState<{input: string, output: string, mode: 'encrypt' | 'decrypt', timestamp: number}[]>([]);
 
-    // Simulate progress during encryption/decryption operations
     useEffect(() => {
         let interval: NodeJS.Timeout;
 
@@ -39,7 +49,6 @@ export function TextEncryption() {
         return () => clearInterval(interval);
     }, [isEncrypting, isDecrypting]);
 
-    // Scroll to output when content changes
     useEffect(() => {
         if (outputText && outputRef.current) {
             outputRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -61,9 +70,9 @@ export function TextEncryption() {
         setErrorMessage(null);
 
         try {
-            // Updated to use the new function signature
             const encrypted = await encryptText(inputText, key, algorithm);
             setOutputText(encrypted);
+            setRecentResults(prev => [{ input: inputText, output: encrypted, mode: 'encrypt', timestamp: Date.now() }, ...prev]);
         } catch (error) {
             console.error('Encryption error:', error);
             setErrorMessage(error instanceof Error ? error.message : 'An error occurred during encryption');
@@ -87,9 +96,9 @@ export function TextEncryption() {
         setErrorMessage(null);
 
         try {
-            // Updated to use the new function signature
             const decrypted = await decryptText(inputText, key, algorithm);
             setOutputText(decrypted);
+            setRecentResults(prev => [{ input: inputText, output: decrypted, mode: 'decrypt', timestamp: Date.now() }, ...prev]);
         } catch (error) {
             console.error('Decryption error:', error);
             setErrorMessage(error instanceof Error ? error.message : 'An error occurred during decryption');
@@ -123,63 +132,72 @@ export function TextEncryption() {
         mode === 'encrypt' ? handleEncrypt() : handleDecrypt();
     };
 
+    const isProcessing = isEncrypting || isDecrypting;
+
     return (
-        <Card className="shadow-soft-lg transition-all duration-300 border border-border/50 animate-fade-in">
-            <CardHeader className="pb-3 space-y-1.5">
+        <Card className="shadow-lg border-border/50 overflow-hidden">
+            <CardHeader className="pb-4 bg-gradient-to-r from-purple-50 to-transparent dark:from-purple-900/10">
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-xl flex items-center gap-2">
-                        <div className="p-1.5 rounded-md bg-primary/10 text-primary">
-                            {mode === 'encrypt' ? <Lock size={18} /> : <Unlock size={18} />}
+                        <div className="p-2 rounded-md bg-purple-600 text-white shadow-sm">
+                            {mode === 'encrypt' ? <Lock size={20} /> : <Unlock size={20} />}
                         </div>
                         Text {mode === 'encrypt' ? 'Encryption' : 'Decryption'}
                     </CardTitle>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className={cn(
-                                "h-8 text-xs font-medium transition-colors",
-                                mode === 'encrypt' ? "bg-primary/10 text-primary border-primary/20" : ""
-                            )}
-                            onClick={() => setMode('encrypt')}
-                        >
-                            <Lock size={14} className="mr-1" />
-                            Encrypt
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className={cn(
-                                "h-8 text-xs font-medium transition-colors",
-                                mode === 'decrypt' ? "bg-primary/10 text-primary border-primary/20" : ""
-                            )}
-                            onClick={() => setMode('decrypt')}
-                        >
-                            <Unlock size={14} className="mr-1" />
-                            Decrypt
-                        </Button>
-                    </div>
+                    
+                    <RadioGroup 
+                        value={mode} 
+                        onValueChange={(value) => setMode(value as 'encrypt' | 'decrypt')}
+                        className="flex gap-1 p-1 bg-muted rounded-lg"
+                    >
+                        <div className="flex items-center space-x-1">
+                            <RadioGroupItem value="encrypt" id="text-encrypt" className="sr-only" />
+                            <Label 
+                                htmlFor="text-encrypt" 
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors flex items-center gap-1.5",
+                                    mode === 'encrypt' ? "bg-card shadow-sm" : "hover:bg-background/50"
+                                )}
+                            >
+                                <Lock size={14} />
+                                Encrypt
+                            </Label>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                            <RadioGroupItem value="decrypt" id="text-decrypt" className="sr-only" />
+                            <Label 
+                                htmlFor="text-decrypt" 
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors flex items-center gap-1.5",
+                                    mode === 'decrypt' ? "bg-card shadow-sm" : "hover:bg-background/50"
+                                )}
+                            >
+                                <Unlock size={14} />
+                                Decrypt
+                            </Label>
+                        </div>
+                    </RadioGroup>
                 </div>
                 <CardDescription>
                     {mode === 'encrypt'
-                        ? "Securely encrypt text using advanced cryptographic algorithms."
-                        : "Decrypt previously encrypted text with the correct key."}
+                        ? "Securely encrypt sensitive text messages with strong cryptographic protection."
+                        : "Decrypt previously encrypted messages with the correct key."}
                 </CardDescription>
             </CardHeader>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} className="contents">
                 <CardContent className="space-y-6">
-                    {/* Input area */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between mb-1.5">
-                            <label htmlFor="input-text" className="block text-sm font-medium">
+                            <label htmlFor="input-text" className="flex items-center gap-1.5 text-sm font-medium">
+                                <MessageSquare size={16} className="text-purple-600" />
                                 {mode === 'encrypt' ? 'Text to Encrypt' : 'Encrypted Text'}
                             </label>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted">
                                 {inputText.length} characters
                             </div>
                         </div>
-                        <div className="relative group">
+                        <div className="relative">
                             <textarea
                                 id="input-text"
                                 value={inputText}
@@ -187,215 +205,354 @@ export function TextEncryption() {
                                 placeholder={mode === 'encrypt'
                                     ? "Enter the text you want to encrypt..."
                                     : "Paste the encrypted text here..."}
-                                className="w-full h-32 p-4 border rounded-lg resize-none focus:ring-2 focus:ring-primary/30 transition-all bg-card"
+                                className="w-full h-36 p-4 border rounded-lg resize-none focus:ring-2 focus:ring-purple-400/30 transition-all bg-card"
                                 required
+                                disabled={isProcessing}
                             />
-                            {inputText && (
-                                <button
+                            {inputText && !isProcessing && (
+                                <Button
                                     type="button"
-                                    className="absolute top-2 right-2 text-muted-foreground/70 hover:text-foreground p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute top-2 right-2 h-6 w-6 p-0 rounded-full text-muted-foreground hover:text-foreground bg-background/50 hover:bg-background"
                                     onClick={() => setInputText('')}
                                     aria-label="Clear input"
                                 >
                                     <X size={14} />
-                                </button>
+                                </Button>
                             )}
                         </div>
                     </div>
 
-                    {/* Encryption key */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                            <label htmlFor="encryption-key" className="block text-sm font-medium">
+                            <label htmlFor="encryption-key" className="flex items-center gap-1.5 text-sm font-medium">
+                                <Key size={16} className="text-purple-600" />
                                 {mode === 'encrypt' ? 'Encryption Key' : 'Decryption Key'}
                             </label>
-                            <div className="relative group">
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                    onClick={handleGenerateKey}
-                                >
-                                    <RefreshCw size={12} className="mr-1" />
-                                    Generate Random Key
-                                </Button>
-                                <div className="absolute bottom-full mb-2 right-0 w-64 p-2 bg-popover text-popover-foreground text-xs rounded-md shadow-soft-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                                    Generates a cryptographically strong random key that will be difficult to guess.
-                                </div>
-                            </div>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                            onClick={handleGenerateKey}
+                                            disabled={isProcessing}
+                                        >
+                                            <RefreshCw size={12} className="mr-1" />
+                                            Generate Secure Key
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                        <p className="text-xs">
+                                            Creates a cryptographically strong key.<br />
+                                            Save this key to decrypt your message later.
+                                        </p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                         </div>
                         <div className="relative">
-                            <Key size={16} className="absolute top-1/2 left-3 transform -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                            <div className="absolute top-1/2 left-3 transform -translate-y-1/2 text-muted-foreground pointer-events-none">
+                                <Lock size={16} />
+                            </div>
                             <input
                                 id="encryption-key"
                                 type="text"
                                 value={key}
                                 onChange={(e) => setKey(e.target.value)}
-                                placeholder="Enter or generate encryption/decryption key"
-                                className="w-full p-2.5 pl-9 border rounded-md focus:ring-2 ring-primary/30 transition-all"
+                                placeholder={mode === 'encrypt' 
+                                    ? "Enter or generate a secure key"
+                                    : "Enter the key used for encryption"}
+                                className="w-full p-3 pl-10 border rounded-lg focus:ring-2 ring-purple-400/30 transition-all"
                                 required
+                                disabled={isProcessing}
                             />
-                            <div className="absolute inset-y-0 right-0 flex items-center pr-1">
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                                    onClick={handleGenerateKey}
-                                    aria-label="Generate random key"
-                                >
-                                    <RefreshCw size={14} />
-                                </Button>
-                            </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                            <Info size={12} className="mt-0.5 flex-shrink-0" />
-                            <span>
-                                {mode === 'encrypt'
-                                    ? "Keep this key safe. You'll need it to decrypt your text later."
-                                    : "Enter the exact key that was used for encryption."}
-                            </span>
-                        </p>
-                    </div>
-
-                    {/* Algorithm selection */}
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <label className="block text-sm font-medium">
-                                Encryption Algorithm
-                            </label>
-                            <div className="relative group">
+                            {key && !isProcessing && (
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
+                                    onClick={() => setKey('')}
                                 >
-                                    <HelpCircle size={12} className="mr-1" />
-                                    Algorithm Help
+                                    <X size={14} />
                                 </Button>
-                                <div className="absolute bottom-full mb-2 right-0 w-64 p-2 bg-popover text-popover-foreground text-xs rounded-md shadow-soft-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                                    <p className="font-medium mb-1">Algorithm Comparison:</p>
-                                    <ul className="space-y-1">
-                                        <li><span className="font-medium">AES:</span> Most secure, modern standard</li>
-                                        <li><span className="font-medium">DES:</span> Older, less secure standard</li>
-                                        <li><span className="font-medium">Triple DES:</span> More secure than DES, but slower than AES</li>
-                                    </ul>
-                                </div>
-                            </div>
+                            )}
                         </div>
-                        <div className="grid grid-cols-3 gap-2">
-                            <button
-                                type="button"
-                                className={cn(
-                                    "border rounded-md py-2.5 px-3 text-center text-sm transition-all",
-                                    algorithm === 'AES'
-                                        ? "bg-primary text-primary-foreground shadow-soft-sm"
-                                        : "bg-card hover:bg-muted/50"
-                                )}
-                                onClick={() => setAlgorithm('AES')}
-                            >
-                                AES
-                            </button>
-                            <button
-                                type="button"
-                                className={cn(
-                                    "border rounded-md py-2.5 px-3 text-center text-sm transition-all",
-                                    algorithm === 'DES'
-                                        ? "bg-primary text-primary-foreground shadow-soft-sm"
-                                        : "bg-card hover:bg-muted/50"
-                                )}
-                                onClick={() => setAlgorithm('DES')}
-                            >
-                                DES
-                            </button>
-                            <button
-                                type="button"
-                                className={cn(
-                                    "border rounded-md py-2.5 px-3 text-center text-sm transition-all",
-                                    algorithm === 'TRIPLE_DES'
-                                        ? "bg-primary text-primary-foreground shadow-soft-sm"
-                                        : "bg-card hover:bg-muted/50"
-                                )}
-                                onClick={() => setAlgorithm('TRIPLE_DES')}
-                            >
-                                Triple DES
-                            </button>
+                        <div className={cn(
+                            "flex items-start gap-1.5 text-xs",
+                            key.length > 0 && key.length < 8 ? "text-amber-500" : "text-muted-foreground"
+                        )}>
+                            <Info size={12} className="mt-0.5 flex-shrink-0" />
+                            <span>
+                                {mode === 'encrypt' 
+                                    ? key.length > 0 && key.length < 8 
+                                        ? "Warning: Short keys are vulnerable. Use at least 8 characters for security." 
+                                        : "Store this key securely. Without it, your message cannot be recovered."
+                                    : "You must provide the exact encryption key used originally."}
+                            </span>
                         </div>
                     </div>
 
-                    {/* Progress when processing */}
-                    {progressValue > 0 && (
-                        <div className="space-y-2 animate-fade-in">
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-muted-foreground">
-                                    {progressValue < 100 ? 'Processing...' : 'Complete!'}
-                                </span>
-                                <span className="text-xs font-medium">{Math.round(progressValue)}%</span>
-                            </div>
-                            <Progress value={progressValue} className="h-1.5" />
-                        </div>
-                    )}
+                    <div>
+                        <button
+                            type="button"
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                            className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-500 transition-colors"
+                            disabled={isProcessing}
+                        >
+                            <ArrowRight 
+                                size={16} 
+                                className={cn(
+                                    "transition-transform",
+                                    showAdvanced && "transform rotate-90"
+                                )} 
+                            />
+                            Advanced Options
+                        </button>
+                        
+                        <AnimatePresence>
+                            {showAdvanced && (
+                                <motion.div 
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="overflow-hidden"
+                                >
+                                    <div className="pt-3 space-y-4">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-sm font-medium flex items-center gap-1.5">
+                                                    <HelpCircle size={16} className="text-purple-600" />
+                                                    Encryption Algorithm
+                                                </label>
+                                            </div>
+                                            <RadioGroup 
+                                                value={algorithm} 
+                                                onValueChange={(value) => setAlgorithm(value as 'AES' | 'DES' | 'TRIPLE_DES')}
+                                                className="flex flex-wrap gap-2"
+                                                disabled={isProcessing}
+                                            >
+                                                <div className="flex items-center space-x-1">
+                                                    <RadioGroupItem value="AES" id="text-aes" className="sr-only" />
+                                                    <Label 
+                                                        htmlFor="text-aes" 
+                                                        className={cn(
+                                                            "px-4 py-2.5 border rounded-md text-sm font-medium cursor-pointer transition-all",
+                                                            algorithm === 'AES' 
+                                                                ? "bg-purple-600 text-white border-purple-600" 
+                                                                : "bg-card hover:bg-muted/50"
+                                                        )}
+                                                    >
+                                                        AES-256 <span className="text-xs ml-1 opacity-80">(Recommended)</span>
+                                                    </Label>
+                                                </div>
+                                                <div className="flex items-center space-x-1">
+                                                    <RadioGroupItem value="DES" id="text-des" className="sr-only" />
+                                                    <Label 
+                                                        htmlFor="text-des" 
+                                                        className={cn(
+                                                            "px-4 py-2.5 border rounded-md text-sm font-medium cursor-pointer transition-all",
+                                                            algorithm === 'DES' 
+                                                                ? "bg-purple-600 text-white border-purple-600" 
+                                                                : "bg-card hover:bg-muted/50"
+                                                        )}
+                                                    >
+                                                        DES
+                                                    </Label>
+                                                </div>
+                                                <div className="flex items-center space-x-1">
+                                                    <RadioGroupItem value="TRIPLE_DES" id="text-triple_des" className="sr-only" />
+                                                    <Label 
+                                                        htmlFor="text-triple_des" 
+                                                        className={cn(
+                                                            "px-4 py-2.5 border rounded-md text-sm font-medium cursor-pointer transition-all",
+                                                            algorithm === 'TRIPLE_DES' 
+                                                                ? "bg-purple-600 text-white border-purple-600" 
+                                                                : "bg-card hover:bg-muted/50"
+                                                        )}
+                                                    >
+                                                        Triple DES
+                                                    </Label>
+                                                </div>
+                                            </RadioGroup>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
 
-                    {/* Error messages */}
-                    {errorMessage && (
-                        <div className="flex gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md animate-fade-in">
-                            <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-                            <div>
-                                <p className="font-medium">Error</p>
-                                <p>{errorMessage}</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Output area - only show when there's output */}
-                    {outputText && (
-                        <div className="space-y-2 mt-4 pt-4 border-t animate-fade-in" ref={outputRef}>
-                            <div className="flex justify-between items-center mb-1.5">
-                                <label className="block text-sm font-medium">
-                                    {mode === 'encrypt' ? 'Encrypted Result' : 'Decrypted Result'}
-                                </label>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={handleSwapContent}
-                                        className="h-7 text-xs"
-                                    >
-                                        Use as Input <ArrowRight size={12} className="ml-1" />
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={handleCopy}
-                                        className="h-7 text-xs"
-                                    >
-                                        {copied ? (
-                                            <Check size={12} className="mr-1 text-green-500" />
-                                        ) : (
-                                            <Copy size={12} className="mr-1" />
-                                        )}
-                                        {copied ? 'Copied!' : 'Copy'}
-                                    </Button>
+                    <AnimatePresence>
+                        {progressValue > 0 && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                                className="space-y-2"
+                            >
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Loader2 
+                                            className={cn(
+                                                "h-4 w-4", 
+                                                progressValue < 100 ? "animate-spin" : ""
+                                            )} 
+                                        />
+                                        <span className="text-muted-foreground">
+                                            {progressValue < 100 ? 'Processing...' : 'Complete!'}
+                                        </span>
+                                    </div>
+                                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                                        {Math.round(progressValue)}%
+                                    </span>
                                 </div>
-                            </div>
-                            <div className="w-full max-h-60 p-4 border rounded-md bg-muted/20 overflow-auto break-all text-sm shadow-inner">
-                                {outputText}
-                            </div>
+                                <Progress 
+                                    value={progressValue} 
+                                    className="h-2 rounded-full bg-purple-100/50 dark:bg-purple-900/20"
+                                    indicatorClassName="bg-purple-600"
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <AnimatePresence>
+                        {errorMessage && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                            >
+                                <Alert className="border-destructive/50 bg-destructive/10">
+                                    <AlertCircle className="h-5 w-5 text-destructive" />
+                                    <AlertTitle className="text-destructive font-medium">Error</AlertTitle>
+                                    <AlertDescription className="text-destructive/90">
+                                        {errorMessage}
+                                    </AlertDescription>
+                                </Alert>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <AnimatePresence>
+                        {outputText && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                                className="space-y-3 pt-2" 
+                                ref={outputRef}
+                            >
+                                <div className="flex justify-between items-center">
+                                    <h3 className="flex items-center gap-1.5 text-sm font-medium">
+                                        <Check size={16} className="text-green-600" />
+                                        {mode === 'encrypt' ? 'Encrypted Result' : 'Decrypted Result'}
+                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={handleSwapContent}
+                                            className="h-7 text-xs"
+                                            disabled={isProcessing}
+                                        >
+                                            Use as Input <ArrowRight size={12} className="ml-1" />
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleCopy}
+                                            className={cn(
+                                                "h-7 text-xs",
+                                                copied && "bg-green-50 text-green-700 border-green-200"
+                                            )}
+                                            disabled={isProcessing}
+                                        >
+                                            {copied ? (
+                                                <Check size={12} className="mr-1 text-green-500" />
+                                            ) : (
+                                                <Copy size={12} className="mr-1" />
+                                            )}
+                                            {copied ? 'Copied!' : 'Copy'}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="relative">
+                                    <div className="w-full max-h-60 p-4 border rounded-lg bg-muted/20 overflow-auto break-all text-sm shadow-inner">
+                                        {outputText}
+                                    </div>
+                                    <div className="absolute top-2 right-2 opacity-30">
+                                        {mode === 'encrypt' ? <Lock size={16} /> : <Unlock size={16} />}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {recentResults.length > 0 && (
+                        <div className="pt-2 border-t">
+                            <Tabs defaultValue="recent">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-medium">Recent Operations</h3>
+                                    <TabsList className="h-7 p-1">
+                                        <TabsTrigger value="recent" className="text-xs px-2 py-1">Recent</TabsTrigger>
+                                        <TabsTrigger value="history" className="text-xs px-2 py-1">History</TabsTrigger>
+                                    </TabsList>
+                                </div>
+                                
+                                <TabsContent value="recent" className="mt-0">
+                                    <div className="border rounded-lg divide-y max-h-40 overflow-auto">
+                                        {recentResults.slice(0, 3).map((item, idx) => (
+                                            <div 
+                                                key={idx} 
+                                                className="p-2 text-xs flex cursor-pointer hover:bg-muted/50"
+                                                onClick={() => {
+                                                    setInputText(item.input);
+                                                    setMode(item.mode === 'encrypt' ? 'decrypt' : 'encrypt');
+                                                }}
+                                            >
+                                                <div className="flex-grow truncate pr-2">
+                                                    <div className="font-medium flex items-center gap-1">
+                                                        {item.mode === 'encrypt' ? (
+                                                            <><Lock size={12} /> Encrypted</>
+                                                        ) : (
+                                                            <><Unlock size={12} /> Decrypted</>
+                                                        )}
+                                                    </div>
+                                                    <div className="truncate text-muted-foreground mt-1">
+                                                        {item.input.substring(0, 30)}
+                                                        {item.input.length > 30 ? '...' : ''}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right text-muted-foreground whitespace-nowrap">
+                                                    {getTimeSince(item.timestamp)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </TabsContent>
+                                
+                                <TabsContent value="history" className="mt-0">
+                                    <div className="text-xs text-muted-foreground">
+                                        View your full encryption history
+                                    </div>
+                                </TabsContent>
+                            </Tabs>
                         </div>
                     )}
                 </CardContent>
 
-                <CardFooter className="flex flex-col sm:flex-row gap-3 pt-2">
+                <CardFooter className="flex flex-col sm:flex-row gap-3 border-t py-4 bg-muted/10">
                     <Button
                         type="submit"
-                        disabled={isEncrypting || isDecrypting || !inputText || !key}
-                        className="w-full sm:flex-1 shadow-soft"
+                        disabled={isProcessing || !inputText || !key}
+                        className="w-full sm:flex-1 shadow-md bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 text-white"
                     >
-                        {isEncrypting || isDecrypting ? (
+                        {isProcessing ? (
                             <>
                                 <Loader2 size={16} className="mr-2 animate-spin" />
                                 {mode === 'encrypt' ? 'Encrypting...' : 'Decrypting...'}
@@ -420,18 +577,28 @@ export function TextEncryption() {
                     <Button
                         type="button"
                         variant="outline"
-                        className="w-full sm:flex-1 shadow-soft-sm"
-                        disabled={isEncrypting || isDecrypting}
+                        className="w-full sm:w-auto"
+                        disabled={isProcessing || (!inputText && !outputText && !key)}
                         onClick={() => {
                             setInputText('');
                             setOutputText('');
                             setErrorMessage(null);
                         }}
                     >
-                        Clear All
+                        <X size={14} className="mr-2" />
+                        Clear
                     </Button>
                 </CardFooter>
             </form>
         </Card>
     );
+}
+
+function getTimeSince(timestamp: number): string {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
 }

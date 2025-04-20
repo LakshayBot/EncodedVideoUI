@@ -3,12 +3,14 @@ import { Button } from '@/components/ui/button';
 import { encryptFile, decryptFile, EncryptionParams, EncryptedFileInfo } from '@/utils/encryptionApi';
 import { 
   Lock, Unlock, Key, Upload, Loader2, AlertCircle, CheckCircle2, 
-  RefreshCw, Download, File, FileX, Info, HelpCircle, AlertTriangle, ChevronRight, X, FileCheck
+  RefreshCw, Download, File, FileX, Info, HelpCircle, AlertTriangle, ChevronRight, X, FileCheck, Shield
 } from 'lucide-react';
 import { cn, generateRandomKey } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface FileEncryptionProps {
     file?: File;
@@ -39,16 +41,13 @@ export function FileEncryption({
     const [dropActive, setDropActive] = useState(false);
     const [dropError, setDropError] = useState(false);
 
-    // Update title when mode changes
     useEffect(() => {
-        // Reset state when mode changes
         setSelectedFile(null);
         setFileEncrypted(null);
         setErrorMessage(null);
         setSuccessMessage(null);
     }, [mode]);
 
-    // Handle file drop events
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         setDropActive(true);
@@ -57,8 +56,6 @@ export function FileEncryption({
 
     const handleDragLeave = (e: React.DragEvent) => {
         e.preventDefault();
-        // Only set dropActive to false if we're leaving the drop target
-        // and not entering a child element
         if (fileDropRef.current && !fileDropRef.current.contains(e.relatedTarget as Node)) {
             setDropActive(false);
         }
@@ -68,7 +65,6 @@ export function FileEncryption({
         e.preventDefault();
         setDropActive(false);
         
-        // Check if there are files and handle the first one
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
             validateAndSetFile(e.dataTransfer.files[0]);
         } else {
@@ -82,7 +78,6 @@ export function FileEncryption({
             validateAndSetFile(e.target.files[0]);
         }
         
-        // Reset the input value so the same file can be selected again
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -92,13 +87,11 @@ export function FileEncryption({
         setErrorMessage(null);
         setSuccessMessage(null);
         
-        // Check file size (100MB max)
         if (file.size > 100 * 1024 * 1024) {
             setErrorMessage('File is too large. Maximum file size is 100MB.');
             return;
         }
         
-        // For decryption mode, validate file extension if needed
         if (mode === 'decrypt' && !file.name.toLowerCase().endsWith('.enc')) {
             setSuccessMessage('Note: Selected file doesn\'t have .enc extension, but we\'ll try to decrypt it anyway.');
         }
@@ -110,7 +103,6 @@ export function FileEncryption({
         const newKey = generateRandomKey();
         setKey(newKey);
         
-        // Visual feedback for key generation
         const keyInput = document.getElementById('encryption-key') as HTMLInputElement;
         if (keyInput) {
             keyInput.classList.add('bg-primary/5');
@@ -118,7 +110,6 @@ export function FileEncryption({
         }
     };
 
-    // Simulate progress stages for user feedback
     const simulateProgressStages = (action: 'encrypt' | 'decrypt') => {
         const stages = {
             encrypt: [
@@ -139,16 +130,14 @@ export function FileEncryption({
         setProgressStage(stages[action][currentStage]);
         
         const interval = setInterval(() => {
-            // 25% chance to move to next stage when below 90%
             if (currentStage < stages[action].length - 1 && Math.random() > 0.75 && progressValue < 90) {
                 currentStage++;
                 setProgressStage(stages[action][currentStage]);
             }
             
             setProgressValue(prev => {
-                if (prev >= 95) return prev; // Cap at 95% until complete
+                if (prev >= 95) return prev;
                 
-                // Start slow, go faster in the middle, slow down toward end
                 let increment;
                 if (prev < 30) increment = Math.random() * 1.5;
                 else if (prev < 60) increment = Math.random() * 2.5;
@@ -191,8 +180,6 @@ export function FileEncryption({
         setSuccessMessage(null);
         setProgressValue(0);
         setProgressStage('');
-        // Optionally reset the key too
-        // setKey('');
     };
 
     const handleEncrypt = async () => {
@@ -224,7 +211,6 @@ export function FileEncryption({
                 key,
                 algorithm,
                 onProgress: (realProgress) => {
-                    // Use real progress if provided by API
                     if (realProgress > 0) {
                         clearInterval(progress.interval);
                         setProgressValue(realProgress);
@@ -238,7 +224,6 @@ export function FileEncryption({
             setFileEncrypted(fileInfo);
             setSuccessMessage(`File encrypted successfully! ${fileInfo.fileName} can now be downloaded.`);
 
-            // Call the callback if provided
             if (onEncryptionComplete) {
                 onEncryptionComplete(fileInfo);
             }
@@ -274,7 +259,6 @@ export function FileEncryption({
                 key,
                 algorithm,
                 onProgress: (realProgress) => {
-                    // Use real progress if provided by API
                     if (realProgress > 0) {
                         clearInterval(progress.interval);
                         setProgressValue(realProgress);
@@ -295,11 +279,9 @@ export function FileEncryption({
             
             setSuccessMessage(`File decrypted successfully! ${decryptedFileName} is ready to download.`);
 
-            // Call the callback if provided
             if (onDecryptionComplete) {
                 onDecryptionComplete(decryptedFile);
             } else {
-                // Download the file automatically
                 const url = URL.createObjectURL(decryptedBlob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -324,7 +306,6 @@ export function FileEncryption({
     const downloadEncryptedFile = () => {
         if (!fileEncrypted) return;
         
-        // Create a download link
         const a = document.createElement('a');
         a.href = fileEncrypted.downloadUrl;
         a.download = fileEncrypted.fileName;
@@ -340,452 +321,494 @@ export function FileEncryption({
     const fileTypeColor = getFileTypeColor(selectedFile?.type || '');
 
     return (
-        <Card className="shadow-soft-lg transition-all duration-300 border border-border/50 overflow-hidden">
-            <CardHeader className="pb-3 space-y-1.5">
-                <div className="flex items-center justify-between">
-                    <CardTitle className="text-xl flex items-center gap-2">
-                        <div className="p-1.5 rounded-md bg-primary/10 text-primary">
-                            {mode === 'encrypt' ? <Lock size={18} /> : <Unlock size={18} />}
-                        </div>
-                        File {mode === 'encrypt' ? 'Encryption' : 'Decryption'}
-                    </CardTitle>
-                    <div className="flex gap-2">
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className={cn(
-                                "h-8 text-xs font-medium transition-colors", 
-                                mode === 'encrypt' ? "bg-primary/10 text-primary border-primary/20" : ""
-                            )}
-                            onClick={() => setMode('encrypt')}
-                            disabled={isProcessing}
-                        >
-                            <Lock size={14} className="mr-1" />
-                            Encrypt
-                        </Button>
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className={cn(
-                                "h-8 text-xs font-medium transition-colors", 
-                                mode === 'decrypt' ? "bg-primary/10 text-primary border-primary/20" : ""
-                            )}
-                            onClick={() => setMode('decrypt')}
-                            disabled={isProcessing}
-                        >
-                            <Unlock size={14} className="mr-1" />
-                            Decrypt
-                        </Button>
-                    </div>
-                </div>
-                <CardDescription>
-                    {mode === 'encrypt' 
-                        ? "Securely encrypt files with strong cryptographic algorithms." 
-                        : "Decrypt previously encrypted files with the correct key."}
-                </CardDescription>
-            </CardHeader>
-            
-            <CardContent className="space-y-6">
-                {/* File drop area */}
-                <div 
-                    ref={fileDropRef}
-                    className={cn(
-                        "border-2 border-dashed rounded-lg transition-all duration-300 relative",
-                        dropActive ? "border-primary bg-primary/5 scale-[1.01]" : "border-border",
-                        dropError ? "border-destructive bg-destructive/5" : "",
-                        selectedFile ? "bg-muted/20" : "bg-transparent",
-                        !isProcessing && "hover:border-primary/50 hover:bg-primary/5 cursor-pointer"
-                    )}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    onClick={isProcessing ? undefined : triggerFileInput}
-                >
-                    <div className="p-6 flex flex-col items-center text-center">
-                        {selectedFile ? (
-                            <>
-                                <div className={cn(
-                                    "w-12 h-12 rounded-full flex items-center justify-center mb-3",
-                                    `bg-${fileTypeColor}-100 dark:bg-${fileTypeColor}-900/20`
-                                )}>
-                                    <FileCheck size={20} className={`text-${fileTypeColor}-600 dark:text-${fileTypeColor}-400`} />
-                                </div>
-                                <h3 className="font-medium text-base mb-1">{selectedFile.name}</h3>
-                                <p className="text-xs text-muted-foreground mb-2">
-                                    {bytesToSize(selectedFile.size)} • {selectedFile.type || 'Unknown type'}
-                                </p>
-                                <div className="flex gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="text-xs h-7"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            triggerFileInput();
-                                        }}
-                                        disabled={isProcessing}
-                                    >
-                                        <Upload size={12} className="mr-1.5" />
-                                        Change file
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-xs text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-7"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedFile(null);
-                                        }}
-                                        disabled={isProcessing}
-                                    >
-                                        <FileX size={12} className="mr-1.5" />
-                                        Remove file
-                                    </Button>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                                    <Upload size={28} className="text-primary" />
-                                </div>
-                                <h3 className="font-medium text-lg mb-2">
-                                    {mode === 'encrypt' ? 'Choose a File to Encrypt' : 'Choose an Encrypted File'}
-                                </h3>
-                                <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                                    Drag and drop a file here, or click to browse your files
-                                </p>
-                                <div className="flex items-center justify-center text-xs text-muted-foreground space-x-2">
-                                    <span className="flex items-center">
-                                        <AlertTriangle size={12} className="mr-1 text-amber-500" />
-                                        Max size: 100MB
-                                    </span>
-                                    {mode === 'decrypt' && (
-                                        <>
-                                            <span className="w-1 h-1 rounded-full bg-border" />
-                                            <span className="flex items-center">
-                                                <File size={12} className="mr-1 text-blue-400" />
-                                                Supports .enc files
-                                            </span>
-                                        </>
-                                    )}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        disabled={isProcessing}
-                    />
-                </div>
-
-                {/* Encryption key */}
-                <div className="space-y-2">
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+        >
+            <Card className="shadow-soft-lg transition-all duration-300 border border-border/50 overflow-hidden">
+                <CardHeader className="pb-3 space-y-1.5 bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/10">
                     <div className="flex items-center justify-between">
-                        <label htmlFor="encryption-key" className="block text-sm font-medium">
-                            {mode === 'encrypt' ? 'Encryption Key' : 'Decryption Key'}
-                        </label>
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                        onClick={handleGenerateKey}
-                                        disabled={isProcessing}
-                                    >
-                                        <RefreshCw size={12} className="mr-1" />
-                                        Generate Random Key
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    <p className="text-xs">
-                                        Generates a cryptographically strong random key.
-                                        <br />
-                                        Save this key as you'll need it to decrypt the file later.
-                                    </p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                    </div>
-                    <div className="relative">
-                        <Key size={16} className="absolute top-1/2 left-3 transform -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                        <input
-                            id="encryption-key"
-                            type="text"
-                            value={key}
-                            onChange={(e) => setKey(e.target.value)}
-                            placeholder={mode === 'encrypt' 
-                                ? "Enter or generate a secure encryption key" 
-                                : "Enter the exact key used to encrypt the file"}
-                            className="w-full p-2.5 pl-9 border rounded-md focus:ring-2 ring-primary/30 transition-all"
-                            required
-                            disabled={isProcessing}
-                        />
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-1">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors"
-                                onClick={handleGenerateKey}
+                        <CardTitle className="text-xl flex items-center gap-2">
+                            <div className="p-2 rounded-md bg-blue-600 text-white shadow-sm">
+                                {mode === 'encrypt' ? <Lock size={20} /> : <Unlock size={20} />}
+                            </div>
+                            File {mode === 'encrypt' ? 'Encryption' : 'Decryption'}
+                        </CardTitle>
+                        <div className="flex gap-2">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className={cn(
+                                    "h-8 text-xs font-medium transition-colors", 
+                                    mode === 'encrypt' ? "bg-blue-600 text-white border-blue-700 hover:bg-blue-700" : ""
+                                )}
+                                onClick={() => setMode('encrypt')}
                                 disabled={isProcessing}
-                                aria-label="Generate random key"
                             >
-                                <RefreshCw size={14} />
+                                <Lock size={14} className="mr-1" />
+                                Encrypt
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className={cn(
+                                    "h-8 text-xs font-medium transition-colors", 
+                                    mode === 'decrypt' ? "bg-blue-600 text-white border-blue-700 hover:bg-blue-700" : ""
+                                )}
+                                onClick={() => setMode('decrypt')}
+                                disabled={isProcessing}
+                            >
+                                <Unlock size={14} className="mr-1" />
+                                Decrypt
                             </Button>
                         </div>
                     </div>
-                    <p className={cn(
-                        "text-xs flex items-start gap-1.5 transition-colors",
-                        key.length > 0 && key.length < 8 ? "text-amber-500" : "text-muted-foreground"
-                    )}>
-                        <Info size={12} className="mt-0.5 flex-shrink-0" />
-                        <span>
-                            {mode === 'encrypt' 
-                                ? key.length > 0 && key.length < 8 
-                                    ? "Warning: Short keys can be easily cracked. Use at least 8 characters." 
-                                    : "Keep this key safe. You'll need it to decrypt your file later."
-                                : "Enter the exact key that was used for encryption."}
-                        </span>
-                    </p>
-                </div>
-
-                {/* Advanced options section */}
-                <div className="space-y-2">
-                    <button
-                        type="button"
-                        onClick={() => setShowAdvanced(!showAdvanced)}
-                        className="text-sm font-medium flex items-center text-primary hover:text-primary/80 transition-colors"
-                        disabled={isProcessing}
+                    <CardDescription>
+                        {mode === 'encrypt' 
+                            ? "Securely encrypt files with military-grade cryptographic protection." 
+                            : "Decrypt previously encrypted files with the correct key."}
+                    </CardDescription>
+                </CardHeader>
+                
+                <CardContent className="space-y-6">
+                    <div 
+                        ref={fileDropRef}
+                        className={cn(
+                            "border-2 border-dashed rounded-lg transition-all duration-300 relative",
+                            dropActive ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-[1.01]" : "border-border",
+                            dropError ? "border-destructive bg-destructive/5" : "",
+                            selectedFile ? "bg-muted/20" : "bg-transparent",
+                            !isProcessing && "hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 cursor-pointer"
+                        )}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        onClick={isProcessing ? undefined : triggerFileInput}
                     >
-                        <ChevronRight 
-                            size={16} 
-                            className={cn(
-                                "transition-transform mr-1",
-                                showAdvanced && "transform rotate-90"
-                            )} 
-                        />
-                        Advanced Options
-                    </button>
-                    
-                    {showAdvanced && (
-                        <div className="pt-2 animate-slideDown">
-                            <div className="space-y-3">
-                                {/* Algorithm selection */}
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <label className="block text-sm font-medium">
-                                            Encryption Algorithm
-                                        </label>
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost" 
-                                                        size="sm"
-                                                        className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                                                        disabled={isProcessing}
-                                                    >
-                                                        <HelpCircle size={12} className="mr-1" />
-                                                        Algorithm Help
-                                                    </Button>
-                                                </TooltipTrigger>
-                                                <TooltipContent side="top" className="max-w-xs">
-                                                    <div className="space-y-1 text-xs">
-                                                        <p className="font-bold">Algorithm Comparison:</p>
-                                                        <ul className="space-y-1.5 ml-2">
-                                                            <li className="flex items-start">
-                                                                <span className="font-semibold mr-1">AES:</span> 
-                                                                <span>Most secure, modern standard encryption.</span>
-                                                            </li>
-                                                            <li className="flex items-start">
-                                                                <span className="font-semibold mr-1">DES:</span> 
-                                                                <span>Older, less secure standard (not recommended).</span>
-                                                            </li>
-                                                            <li className="flex items-start">
-                                                                <span className="font-semibold mr-1">Triple DES:</span> 
-                                                                <span>More secure than DES, but slower than AES.</span>
-                                                            </li>
-                                                        </ul>
-                                                    </div>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <button
-                                            type="button"
-                                            className={cn(
-                                                "border rounded-md py-2.5 px-3 text-center text-sm transition-all",
-                                                algorithm === 'AES' 
-                                                    ? "bg-primary text-primary-foreground font-medium shadow-sm" 
-                                                    : "bg-card hover:bg-muted/50",
-                                                isProcessing && "opacity-50 cursor-not-allowed"
-                                            )}
-                                            onClick={() => setAlgorithm('AES')}
-                                            disabled={isProcessing}
-                                        >
-                                            AES
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={cn(
-                                                "border rounded-md py-2.5 px-3 text-center text-sm transition-all",
-                                                algorithm === 'DES' 
-                                                    ? "bg-primary text-primary-foreground font-medium shadow-sm" 
-                                                    : "bg-card hover:bg-muted/50",
-                                                isProcessing && "opacity-50 cursor-not-allowed"
-                                            )}
-                                            onClick={() => setAlgorithm('DES')}
-                                            disabled={isProcessing}
-                                        >
-                                            DES
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className={cn(
-                                                "border rounded-md py-2.5 px-3 text-center text-sm transition-all",
-                                                algorithm === 'TRIPLE_DES' 
-                                                    ? "bg-primary text-primary-foreground font-medium shadow-sm" 
-                                                    : "bg-card hover:bg-muted/50",
-                                                isProcessing && "opacity-50 cursor-not-allowed"
-                                            )}
-                                            onClick={() => setAlgorithm('TRIPLE_DES')}
-                                            disabled={isProcessing}
-                                        >
-                                            Triple DES
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Progress indicator */}
-                {progressValue > 0 && (
-                    <div className="space-y-3 pt-2 animate-fadeIn">
-                        <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-2 text-sm">
-                                <Loader2 
-                                    className={cn(
-                                        "h-4 w-4", 
-                                        progressValue < 100 ? "animate-spin" : ""
-                                    )} 
-                                />
-                                <span className="text-muted-foreground">{progressStage}</span>
-                            </div>
-                            <span className="text-xs font-medium">
-                                {progressValue < 100 ? `${Math.round(progressValue)}%` : 'Complete'}
-                            </span>
-                        </div>
-                        <Progress value={progressValue} className="h-1.5" />
-                    </div>
-                )}
-
-                {/* Success message */}
-                {successMessage && (
-                    <div className="flex gap-3 bg-green-500/10 text-green-700 dark:text-green-400 p-3 rounded-md animate-fadeIn">
-                        <CheckCircle2 size={18} className="text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" />
-                        <div className="space-y-1 flex-1">
-                            <p className="font-medium">{mode === 'encrypt' ? 'Encryption Successful' : 'Decryption Successful'}</p>
-                            <p className="text-sm">{successMessage}</p>
-                            {fileEncrypted && (
-                                <div className="pt-1">
-                                    <Button 
-                                        size="sm" 
-                                        className="h-7 mt-1 text-xs bg-green-600 hover:bg-green-700 text-white"
-                                        onClick={downloadEncryptedFile}
-                                    >
-                                        <Download size={12} className="mr-1.5" />
-                                        Download Encrypted File
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 flex-shrink-0 text-green-700 dark:text-green-400 self-start"
-                            onClick={() => setSuccessMessage(null)}
-                        >
-                            <X size={14} />
-                        </Button>
-                    </div>
-                )}
-
-                {/* Error messages */}
-                {errorMessage && (
-                    <div className="flex gap-3 bg-destructive/10 text-destructive p-3 rounded-md animate-fadeIn">
-                        <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
-                        <div className="space-y-1 flex-1">
-                            <p className="font-medium">Error</p>
-                            <p className="text-sm">{errorMessage}</p>
-                        </div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 flex-shrink-0 text-destructive self-start"
-                            onClick={() => setErrorMessage(null)}
-                        >
-                            <X size={14} />
-                        </Button>
-                    </div>
-                )}
-            </CardContent>
-
-            <CardFooter className="flex flex-col sm:flex-row gap-3 border-t pt-4">
-                <Button
-                    onClick={mode === 'encrypt' ? handleEncrypt : handleDecrypt}
-                    disabled={isProcessing || !selectedFile || !key}
-                    className="w-full sm:flex-1 shadow-sm"
-                >
-                    {isProcessing ? (
-                        <>
-                            <Loader2 size={16} className="mr-2 animate-spin" />
-                            {isEncrypting ? 'Encrypting...' : 'Decrypting...'}
-                        </>
-                    ) : (
-                        <>
-                            {mode === 'encrypt' ? (
+                        <div className="p-6 flex flex-col items-center text-center">
+                            {selectedFile ? (
                                 <>
-                                    <Lock size={16} className="mr-2" />
-                                    Encrypt File
+                                    <div className={cn(
+                                        "w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-blue-100 dark:bg-blue-900/30"
+                                    )}>
+                                        <FileCheck size={32} className="text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <h3 className="font-medium text-base mb-1">{selectedFile.name}</h3>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Badge variant="secondary" className="text-xs font-normal">
+                                            {bytesToSize(selectedFile.size)}
+                                        </Badge>
+                                        <Badge variant="outline" className="text-xs font-normal">
+                                            {selectedFile.type || 'Unknown type'}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs h-8"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                triggerFileInput();
+                                            }}
+                                            disabled={isProcessing}
+                                        >
+                                            <Upload size={12} className="mr-1.5" />
+                                            Change file
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-xs text-destructive hover:text-destructive/80 hover:bg-destructive/10 h-8"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedFile(null);
+                                            }}
+                                            disabled={isProcessing}
+                                        >
+                                            <FileX size={12} className="mr-1.5" />
+                                            Remove file
+                                        </Button>
+                                    </div>
                                 </>
                             ) : (
                                 <>
-                                    <Unlock size={16} className="mr-2" />
-                                    Decrypt File
+                                    <div className="w-20 h-20 rounded-full bg-blue-100/60 dark:bg-blue-900/20 flex items-center justify-center mb-4">
+                                        <Upload size={34} className="text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <h3 className="font-medium text-lg mb-2">
+                                        {mode === 'encrypt' ? 'Choose a File to Encrypt' : 'Choose an Encrypted File'}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground mb-4 max-w-sm">
+                                        Drag and drop a file here, or click to browse your files
+                                    </p>
+                                    <div className="flex items-center justify-center text-xs text-muted-foreground space-x-3">
+                                        <span className="flex items-center px-2 py-1 bg-muted/60 rounded">
+                                            <AlertTriangle size={12} className="mr-1.5 text-amber-500" />
+                                            Max size: 100MB
+                                        </span>
+                                        {mode === 'decrypt' && (
+                                            <span className="flex items-center px-2 py-1 bg-muted/60 rounded">
+                                                <File size={12} className="mr-1.5 text-blue-500" />
+                                                Supports .enc files
+                                            </span>
+                                        )}
+                                    </div>
                                 </>
                             )}
-                        </>
-                    )}
-                </Button>
+                        </div>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileSelect}
+                            className="hidden"
+                            disabled={isProcessing}
+                        />
+                    </div>
 
-                <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full sm:flex-1"
-                    disabled={isProcessing || (!selectedFile && !key)}
-                    onClick={resetForm}
-                >
-                    <X size={14} className="mr-2" />
-                    Reset
-                </Button>
-            </CardFooter>
-        </Card>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label htmlFor="encryption-key" className="flex items-center gap-2 text-sm font-medium">
+                                <div className="p-1 rounded bg-blue-100 dark:bg-blue-900/30">
+                                    <Key size={16} className="text-blue-600 dark:text-blue-400" />
+                                </div>
+                                {mode === 'encrypt' ? 'Encryption Key' : 'Decryption Key'}
+                            </label>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                            onClick={handleGenerateKey}
+                                            disabled={isProcessing}
+                                        >
+                                            <RefreshCw size={12} className="mr-1" />
+                                            Generate Random Key
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                        <p className="text-xs">
+                                            Generates a cryptographically strong random key.
+                                            <br />
+                                            Save this key as you'll need it to decrypt the file later.
+                                        </p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Shield size={16} className="text-muted-foreground" />
+                            </div>
+                            <input
+                                id="encryption-key"
+                                type="text"
+                                value={key}
+                                onChange={(e) => setKey(e.target.value)}
+                                placeholder={mode === 'encrypt' 
+                                    ? "Enter or generate a secure encryption key" 
+                                    : "Enter the exact key used to encrypt the file"}
+                                className="w-full p-2.5 pl-10 border rounded-md focus:ring-2 ring-blue-400/30 transition-all"
+                                required
+                                disabled={isProcessing}
+                            />
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors"
+                                    onClick={handleGenerateKey}
+                                    disabled={isProcessing}
+                                    aria-label="Generate random key"
+                                >
+                                    <RefreshCw size={14} />
+                                </Button>
+                            </div>
+                        </div>
+                        <p className={cn(
+                            "text-xs flex items-start gap-1.5 transition-colors",
+                            key.length > 0 && key.length < 8 ? "text-amber-500" : "text-muted-foreground"
+                        )}>
+                            <Info size={12} className="mt-0.5 flex-shrink-0" />
+                            <span>
+                                {mode === 'encrypt' 
+                                    ? key.length > 0 && key.length < 8 
+                                        ? "Warning: Short keys can be easily cracked. Use at least 8 characters." 
+                                        : "Keep this key safe. You'll need it to decrypt your file later."
+                                    : "Enter the exact key that was used for encryption."}
+                            </span>
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                            className="text-sm font-medium flex items-center text-blue-600 hover:text-blue-800 transition-colors"
+                            disabled={isProcessing}
+                        >
+                            <ChevronRight 
+                                size={16} 
+                                className={cn(
+                                    "transition-transform mr-1.5",
+                                    showAdvanced && "transform rotate-90"
+                                )} 
+                            />
+                            Advanced Options
+                        </button>
+                        
+                        <AnimatePresence>
+                            {showAdvanced && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="pt-2 overflow-hidden"
+                                >
+                                    <div className="space-y-3 p-4 rounded-lg bg-muted/20 border">
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <label className="flex items-center gap-2 text-sm font-medium">
+                                                    <HelpCircle size={15} className="text-blue-600" />
+                                                    Encryption Algorithm
+                                                </label>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost" 
+                                                                size="sm"
+                                                                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                                                disabled={isProcessing}
+                                                            >
+                                                                <HelpCircle size={12} className="mr-1" />
+                                                                Algorithm Help
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent side="top" className="max-w-xs">
+                                                            <div className="space-y-1 text-xs">
+                                                                <p className="font-bold">Algorithm Comparison:</p>
+                                                                <ul className="space-y-1.5 ml-2">
+                                                                    <li className="flex items-start">
+                                                                        <span className="font-semibold mr-1">AES:</span> 
+                                                                        <span>Most secure, modern standard encryption.</span>
+                                                                    </li>
+                                                                    <li className="flex items-start">
+                                                                        <span className="font-semibold mr-1">DES:</span> 
+                                                                        <span>Older, less secure standard (not recommended).</span>
+                                                                    </li>
+                                                                    <li className="flex items-start">
+                                                                        <span className="font-semibold mr-1">Triple DES:</span> 
+                                                                        <span>More secure than DES, but slower than AES.</span>
+                                                                    </li>
+                                                                </ul>
+                                                            </div>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <button
+                                                    type="button"
+                                                    className={cn(
+                                                        "border rounded-md py-2.5 px-3 text-center text-sm font-medium transition-all",
+                                                        algorithm === 'AES' 
+                                                            ? "bg-blue-600 text-white shadow-sm border-blue-600" 
+                                                            : "bg-card hover:bg-muted/70 border-muted",
+                                                        isProcessing && "opacity-50 cursor-not-allowed"
+                                                    )}
+                                                    onClick={() => setAlgorithm('AES')}
+                                                    disabled={isProcessing}
+                                                >
+                                                    AES
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={cn(
+                                                        "border rounded-md py-2.5 px-3 text-center text-sm font-medium transition-all",
+                                                        algorithm === 'DES' 
+                                                            ? "bg-blue-600 text-white shadow-sm border-blue-600" 
+                                                            : "bg-card hover:bg-muted/70 border-muted",
+                                                        isProcessing && "opacity-50 cursor-not-allowed"
+                                                    )}
+                                                    onClick={() => setAlgorithm('DES')}
+                                                    disabled={isProcessing}
+                                                >
+                                                    DES
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={cn(
+                                                        "border rounded-md py-2.5 px-3 text-center text-sm font-medium transition-all",
+                                                        algorithm === 'TRIPLE_DES' 
+                                                            ? "bg-blue-600 text-white shadow-sm border-blue-600" 
+                                                            : "bg-card hover:bg-muted/70 border-muted",
+                                                        isProcessing && "opacity-50 cursor-not-allowed"
+                                                    )}
+                                                    onClick={() => setAlgorithm('TRIPLE_DES')}
+                                                    disabled={isProcessing}
+                                                >
+                                                    Triple DES
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    <AnimatePresence>
+                        {progressValue > 0 && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: 10 }} 
+                                animate={{ opacity: 1, y: 0 }} 
+                                exit={{ opacity: 0 }}
+                                className="space-y-3 pt-2"
+                            >
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Loader2 
+                                            className={cn(
+                                                "h-4 w-4 text-blue-600", 
+                                                progressValue < 100 ? "animate-spin" : ""
+                                            )} 
+                                        />
+                                        <span className="text-blue-800 dark:text-blue-300 font-medium">{progressStage}</span>
+                                    </div>
+                                    <Badge variant={progressValue < 100 ? "outline" : "default"} className="text-xs px-2 py-0">
+                                        {progressValue < 100 ? `${Math.round(progressValue)}%` : 'Complete'}
+                                    </Badge>
+                                </div>
+                                <Progress 
+                                    value={progressValue} 
+                                    className="h-2 bg-blue-100 dark:bg-blue-900/30" 
+                                    indicatorClassName="bg-blue-600"
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <AnimatePresence>
+                        {successMessage && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                            >
+                                <div className="flex gap-3 bg-green-500/10 text-green-700 dark:text-green-400 p-4 rounded-md">
+                                    <CheckCircle2 size={20} className="text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                                    <div className="space-y-2 flex-1">
+                                        <p className="font-medium text-green-800 dark:text-green-300">
+                                            {mode === 'encrypt' ? 'Encryption Successful' : 'Decryption Successful'}
+                                        </p>
+                                        <p className="text-sm">{successMessage}</p>
+                                        {fileEncrypted && (
+                                            <div className="pt-2">
+                                                <Button 
+                                                    size="sm" 
+                                                    className="h-8 text-xs bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                                                    onClick={downloadEncryptedFile}
+                                                >
+                                                    <Download size={14} className="mr-1.5" />
+                                                    Download Encrypted File
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 flex-shrink-0 text-green-700 dark:text-green-400 self-start"
+                                        onClick={() => setSuccessMessage(null)}
+                                    >
+                                        <X size={14} />
+                                    </Button>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <AnimatePresence>
+                        {errorMessage && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                            >
+                                <div className="flex gap-3 bg-destructive/10 text-destructive p-4 rounded-md">
+                                    <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
+                                    <div className="space-y-1 flex-1">
+                                        <p className="font-medium text-destructive">Error</p>
+                                        <p className="text-sm">{errorMessage}</p>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 flex-shrink-0 text-destructive self-start"
+                                        onClick={() => setErrorMessage(null)}
+                                    >
+                                        <X size={14} />
+                                    </Button>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </CardContent>
+
+                <CardFooter className="flex flex-col sm:flex-row gap-3 border-t p-4 bg-muted/10">
+                    <Button
+                        onClick={mode === 'encrypt' ? handleEncrypt : handleDecrypt}
+                        disabled={isProcessing || !selectedFile || !key}
+                        className="w-full sm:flex-1 shadow-sm bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
+                    >
+                        {isProcessing ? (
+                            <>
+                                <Loader2 size={16} className="mr-2 animate-spin" />
+                                {isEncrypting ? 'Encrypting...' : 'Decrypting...'}
+                            </>
+                        ) : (
+                            <>
+                                {mode === 'encrypt' ? (
+                                    <>
+                                        <Lock size={16} className="mr-2" />
+                                        Encrypt File
+                                    </>
+                                ) : (
+                                    <>
+                                        <Unlock size={16} className="mr-2" />
+                                        Decrypt File
+                                    </>
+                                )}
+                            </>
+                        )}
+                    </Button>
+
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full sm:flex-1"
+                        disabled={isProcessing || (!selectedFile && !key)}
+                        onClick={resetForm}
+                    >
+                        <X size={14} className="mr-2" />
+                        Reset
+                    </Button>
+                </CardFooter>
+            </Card>
+        </motion.div>
     );
 }
 
-// Helper function to get color based on file type
 function getFileTypeColor(mimeType: string): string {
     if (!mimeType) return 'gray';
     

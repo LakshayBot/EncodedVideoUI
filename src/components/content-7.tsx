@@ -1,4 +1,4 @@
-import { Cpu, Zap, Lock, Shield, Eye } from 'lucide-react'
+import { Zap, Lock, Shield, Eye } from 'lucide-react'
 
 // Create a custom Image component for React+Vite
 const Image = ({ src, alt, width, height, className }: { 
